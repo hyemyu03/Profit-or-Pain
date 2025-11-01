@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>샘송주식 미니게임 · Extreme Hard + Game Over (최종 수익)</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F8FAFD;--card:#fff;--ink:#2E2E3A;--muted:#6F7785;--line:#E9EEF5;
+--blue:#8EBBFF;--blue-h:#7EADFF;--red:#FF9C9C;--red-h:#FF8C8C;--shadow:0 8px 28px rgba(25,35,55,.06);--radius:20px;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font-family:"Noto Sans KR",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple SD Gothic Neo","맑은 고딕","Malgun Gothic",sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;color:var(--ink)}
+.wrap{width:min(520px,100%)}
+.pills{display:flex;gap:14px;margin-bottom:16px}
+.pill{flex:1;background:#EFF4FA;border-radius:999px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+.pill small{color:var(--muted);font-weight:600}.pill b{font-weight:900}
+.rate.pos{color:#2BAE66}.rate.neg{color:#D93E3E}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;transition:.25s;outline:2px solid transparent;position:relative}
+.card.glow-blue{box-shadow:0 0 0 3px rgba(142,187,255,.45),var(--shadow)}
+.card.glow-red{box-shadow:0 0 0 3px rgba(255,156,156,.45),var(--shadow)}
+header{text-align:center;padding:16px 0 0}.title{font-weight:900;font-size:26px}
+.board{padding:12px 18px 0;position:relative}.chart{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;position:relative}
+canvas{display:block;width:100%;height:280px}
+.minmax{position:absolute;left:10px;top:10px;right:10px;display:flex;justify-content:space-between;font-weight:800;font-size:14px;pointer-events:none}
+.minmax span{background:rgba(255,255,255,.85);border:1px solid var(--line);border-radius:999px;padding:6px 10px}
+.start,.gameover{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px}
+.panel{background:rgba(255,255,255,.94);backdrop-filter:blur(4px);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 24px rgba(15,23,42,.06);padding:24px;text-align:center;width:min(420px,95%)}
+.start h3{margin:0 0 8px;font-size:20px;font-weight:900}
+.start p{margin:0 0 14px;color:var(--muted);font-weight:700;font-size:14px}
+.start button{border:0;border-radius:14px;padding:12px 16px;font-weight:900;font-size:18px;background:var(--blue);cursor:pointer;box-shadow:0 2px 0 rgba(30,41,59,.12)}
+.controls{padding:16px 18px 18px;display:grid;gap:12px;border-top:1px solid var(--line)}.row{display:grid;gap:12px}@media(min-width:480px){.row{grid-template-columns:1fr 1fr}}
+button.action{border:0;border-radius:16px;padding:16px 18px;font-weight:900;font-size:19px;box-shadow:0 3px 0 rgba(30,41,59,.12)}
+#buyBtn{background:var(--blue)}#sellBtn{background:var(--red)}button:disabled{opacity:.55;cursor:not-allowed}
+.status{padding:12px 18px 16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;color:var(--muted);font-weight:700}
+.msg{padding:0 18px 18px;font-weight:800;min-height:22px}
+.timerbar{height:8px;margin:0 18px 18px;background:#EEF2F7;border-radius:999px;overflow:hidden}
+.timerbar i{display:block;height:100%;background:linear-gradient(90deg,#B8E1FF,#FFE0E0);transform-origin:left center;transform:scaleX(1)}
+
+/* GAME OVER */
+.gameover{display:none}
+.go-title{font-size:22px;font-weight:900;margin:0}
+.go-profit{font-size:32px;font-weight:900;margin:10px 0 8px}
+.go-profit.pos{color:#1E7A45}.go-profit.neg{color:#C62828}
+.go-asset{font-size:18px;font-weight:800;margin:4px 0 10px}
+.go-row{display:flex;gap:10px;justify-content:center;margin:6px 0}
+.badge{background:#F2F6FD;border:1px solid #E3ECFA;border-radius:999px;padding:8px 12px;font-weight:800}
+.badge.red{background:#FFECEC;border-color:#FFD2D2}
+.badge.green{background:#EFFFF3;border-color:#CFF5DB}
+.go-actions{display:flex;gap:10px;justify-content:center;margin-top:12px}
+.btn{border:0;border-radius:12px;padding:10px 14px;font-weight:900;cursor:pointer}
+.btn.primary{background:#2E2E3A;color:#fff}
+.btn.ghost{background:#fff;border:1px solid var(--line)}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="pills">
+    <div class="pill"><small>내 자산</small><b id="moneyTxt">₩1,000,000</b></div>
+    <div class="pill"><small>수익률</small><b id="rateTxt" class="rate pos">+0.0%</b></div>
+  </div>
+
+  <div class="card" id="cardBox">
+    <header><div class="title">샘송주식</div></header>
+
+    <section class="board">
+      <div class="chart">
+        <div class="minmax"><span id="minTxt">최저:-</span><span id="maxTxt">최고:-</span></div>
+        <canvas id="chart"></canvas>
+
+        <!-- Start overlay -->
+        <div id="startOverlay" class="start">
+          <div class="panel">
+            <h3>샘송주식 미니게임</h3>
+            <p>폭등·폭락의 세계에 오신 걸 환영합니다</p>
+            <button id="startBtn">시작하기</button>
+          </div>
+        </div>
+
+        <!-- Game Over overlay -->
+        <div id="gameOver" class="gameover">
+          <div class="panel">
+            <div class="go-title">게임 오버</div>
+            <div id="goProfit" class="go-profit">최종 수익: -</div>
+            <div id="goAsset" class="go-asset">최종 자산: -</div>
+            <div class="go-row">
+              <div class="badge" id="goRate">수익률: -</div>
+            </div>
+            <div class="go-row">
+              <div class="badge green" id="goWin">성공 0회</div>
+              <div class="badge red" id="goLose">실패 0회</div>
+            </div>
+            <div class="go-actions">
+              <button class="btn primary" id="againBtn">다시하기</button>
+              <button class="btn ghost" id="closeBtn">닫기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="controls">
+      <div class="row">
+        <button id="buyBtn" class="action" disabled>매수하기</button>
+        <button id="sellBtn" class="action" disabled>매각하기</button>
+      </div>
+    </div>
+
+    <div class="status">
+      <div>남은 시간: <b id="timeTxt">15s</b></div>
+      <div id="tradeTxt">대기 중</div>
+    </div>
+
+    <div class="msg" id="msg"></div>
+    <div class="timerbar"><i id="bar"></i></div>
+  </div>
+</div>
+
+<script>
+const START_MONEY=1_000_000,BASE_PRICE=50000,RANGE=20000;
+let money=START_MONEY,timeLeft=15,playing=false,holding=false,buyPrice=0,chartFrame,lastSwitch=0,currPts=[],nextPts=[];
+let wins=0, losses=0;
+const dpr=window.devicePixelRatio||1;
+const canvas=document.getElementById("chart"); const ctx=canvas.getContext("2d");
+function resize(){const r=canvas.getBoundingClientRect();canvas.width=Math.floor(r.width*dpr);canvas.height=Math.floor(280*dpr);} resize(); window.addEventListener("resize",resize);
+const $=s=>document.querySelector(s), fmt=n=>"₩"+n.toLocaleString();
+function setRate(){const r=(money/START_MONEY-1)*100;$("#rateTxt").textContent=(r>=0?"+":"")+r.toFixed(1)+"%";$("#rateTxt").classList.toggle("pos",r>=0);$("#rateTxt").classList.toggle("neg",r<0)}
+function setTime(){ $("#timeTxt").textContent=timeLeft+"s"; $("#bar").style.transform=`scaleX(${timeLeft/15})`; }
+
+function gen(){const amp=0.35,jit=0.018,ph=Math.random()*6;return Array.from({length:60},(_,i)=>Math.max(0.05,Math.min(0.95,0.5+amp*Math.sin(i*0.25+ph)+(Math.random()*jit-jit/2))));}
+function ease(t){return t<.5?2*t*t:-1+(4-2*t)*t}
+function series(){const p=Math.min(1,(performance.now()-lastSwitch)/900),e=ease(p);return currPts.map((v,i)=>v+(nextPts[i]-v)*e)} // ~0.9s per morph
+
+function flash(cls){const b=$("#cardBox");b.classList.add(cls);setTimeout(()=>b.classList.remove(cls),500)}
+
+function buy(){
+  if(!playing||holding)return;
+  const s=series(); const i=Math.floor(Math.random()*s.length);
+  buyPrice = BASE_PRICE + Math.round((s[i]-0.5)*RANGE);
+  holding=true; $("#sellBtn").disabled=false;
+  $("#tradeTxt").textContent="매수됨"; $("#msg").textContent=`${fmt(buyPrice)}에 매수`;
+  flash("glow-blue");
+}
+
+function sell(){
+  if(!playing||!holding)return;
+  holding=false; $("#sellBtn").disabled=true;
+  const ok=Math.random()<0.35;
+  if(ok){
+    const r=[0.05,0.08,0.10,0.12][Math.floor(Math.random()*4)];
+    const g=Math.floor(buyPrice*r); money+=g; wins++;
+    $("#msg").textContent=`매각 성공! +${fmt(g)} 📈`; $("#tradeTxt").textContent="성공"; flash("glow-blue");
+  }else{
+    const r=[0.10,0.15,0.20,0.25][Math.floor(Math.random()*4)];
+    const l=Math.floor(buyPrice*r); money=Math.max(0,money-l); losses++;
+    $("#msg").textContent=`매각 실패… -${fmt(l)} 📉`; $("#tradeTxt").textContent="실패"; flash("glow-red");
+  }
+  $("#moneyTxt").textContent=fmt(money); setRate();
+}
+
+function stopChart(){ cancelAnimationFrame(chartFrame); }
+
+function showGameOver(){
+  const pnl = money - START_MONEY;
+  const rate = (money/START_MONEY - 1)*100;
+  const pEl = document.getElementById("goProfit");
+  pEl.textContent = `최종 수익: ${(pnl>=0?"+":"")}${fmt(Math.abs(pnl))}`;
+  pEl.classList.toggle("pos", pnl>=0);
+  pEl.classList.toggle("neg", pnl<0);
+  document.getElementById("goAsset").textContent = `최종 자산: ${fmt(money)}`;
+  document.getElementById("goRate").textContent  = `수익률: ${(rate>=0?"+":"")}${rate.toFixed(1)}%`;
+  document.getElementById("goWin").textContent   = `성공 ${wins}회`;
+  document.getElementById("goLose").textContent  = `실패 ${losses}회`;
+  document.getElementById("gameOver").style.display="flex";
+}
+
+function tickEnd(){
+  playing=false; stopChart();
+  $("#buyBtn").disabled=true; $("#sellBtn").disabled=true;
+  $("#tradeTxt").textContent="종료"; $("#msg").textContent="게임 종료!";
+  showGameOver();
+}
+
+function draw(now){
+  if(!playing) return;
+  const w=canvas.width,h=canvas.height;
+  if(now-lastSwitch>900){ currPts=nextPts; nextPts=gen(); lastSwitch=now; }
+  const s=series();
+
+  // live min/max display
+  let min=Infinity,max=-Infinity,imin=0,imax=0;
+  s.forEach((v,i)=>{ if(v<min){min=v;imin=i} if(v>max){max=v;imax=i} });
+  $("#minTxt").textContent=`최저: ${fmt(BASE_PRICE+Math.round((min-0.5)*RANGE))}`;
+  $("#maxTxt").textContent=`최고: ${fmt(BASE_PRICE+Math.round((max-0.5)*RANGE))}`;
+
+  // draw
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle="#F1F5FB"; ctx.lineWidth=1*dpr;
+  for(let i=1;i<=6;i++){const y=i/6*h; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();}
+  ctx.lineWidth=3*dpr; ctx.strokeStyle="#F6CF79"; ctx.beginPath();
+  s.forEach((v,i)=>{const x=i/(s.length-1)*w, y=h-v*h; i?ctx.lineTo(x,y):ctx.moveTo(x,y)}); ctx.stroke();
+
+  const col=10,cw=w/col;
+  for(let i=0;i<col;i++){
+    const i1=Math.floor(i/col*s.length), i2=Math.min(s.length-1, i1+3);
+    const v1=s[i1], v2=s[i2]; const y1=h-v1*h, y2=h-v2*h;
+    const up=y2<y1; ctx.fillStyle=up?"rgba(142,187,255,.85)":"rgba(255,156,156,.85)";
+    ctx.fillRect(i*cw+cw*.22, Math.min(y1,y2), cw*.56, Math.max(6*dpr, Math.abs(y2-y1)));
+  }
+
+  // min/max dots
+  ctx.fillStyle="#FF9C9C"; ctx.beginPath(); ctx.arc(imin/(s.length-1)*w, h-min*h, 5*dpr, 0, 6.28); ctx.fill();
+  ctx.fillStyle="#8EBBFF"; ctx.beginPath(); ctx.arc(imax/(s.length-1)*w, h-max*h, 5*dpr, 0, 6.28); ctx.fill();
+
+  chartFrame=requestAnimationFrame(draw);
+}
+
+function startGame(){
+  if(playing) return;
+  playing=true; timeLeft=15;
+  $("#startOverlay").style.display="none";
+  $("#buyBtn").disabled=false; $("#sellBtn").disabled=true;
+  $("#tradeTxt").textContent="시작"; $("#msg").textContent="";
+  currPts=gen(); nextPts=gen(); lastSwitch=performance.now();
+  draw(lastSwitch);
+  const timer=setInterval(()=>{
+    timeLeft--; setTime();
+    if(timeLeft<=0){ clearInterval(timer); tickEnd(); }
+  },1000);
+}
+
+document.getElementById("startBtn").addEventListener("click", startGame);
+document.getElementById("buyBtn").addEventListener("click", buy);
+document.getElementById("sellBtn").addEventListener("click", sell);
+document.getElementById("againBtn").addEventListener("click", ()=>location.reload());
+document.getElementById("closeBtn").addEventListener("click", ()=>document.getElementById("gameOver").style.display="none");
+
+// init
+$("#moneyTxt").textContent=fmt(money); setRate(); setTime();
+</script>
+</body>
+</html>
